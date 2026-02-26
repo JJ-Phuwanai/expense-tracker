@@ -1,124 +1,119 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { parseDDMMYYYY } from '@/lib/date';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { parseDDMMYYYY } from "@/lib/date";
+import { HistoryHeader } from "@/components/history-header";
+import { HistoryFilters } from "@/components/history-filters";
+import { HistoryList } from "@/components/history-list";
+import {
+  Expense,
+  SortKey,
+  toStartOfDay,
+  toEndOfDay,
+} from "@/lib/finance-utils";
 
-type Expense = {
-    date: string;
-    item: string;
-    type: string;
-    amount: number;
-    category: string;
-    owner: string;
-};
+export default function HistoryPage() {
+  const [loading, setLoading] = useState(true);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
-type SortKey = 'date' | 'category' | 'item';
+  const [q, setQ] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [fromISO, setFromISO] = useState("");
+  const [toISO, setToISO] = useState("");
 
-export default function ListPage() {
-    const [loading, setLoading] = useState(true);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [sortKey, setSortKey] = useState<SortKey>('date');
-    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-
-    async function load() {
-        setLoading(true);
-        const data = await fetch('/api/expenses').then((r) => r.json());
-        setExpenses(data.expenses ?? []);
-        setLoading(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/expenses", { cache: "no-store" });
+      const data = await res.json();
+      setExpenses(data.expenses ?? []);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    useEffect(() => {
-        load();
-    }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-    const sorted = useMemo(() => {
-        const arr = [...expenses];
-        arr.sort((a, b) => {
-            let av: any = '';
-            let bv: any = '';
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    const fromDate = fromISO ? toStartOfDay(new Date(fromISO)) : null;
+    const toDate = toISO ? toEndOfDay(new Date(toISO)) : null;
 
-            if (sortKey === 'date') {
-                av = parseDDMMYYYY(a.date);
-                bv = parseDDMMYYYY(b.date);
-            } else if (sortKey === 'category') {
-                av = (a.category ?? '').toLowerCase();
-                bv = (b.category ?? '').toLowerCase();
-            } else {
-                av = (a.item ?? '').toLowerCase();
-                bv = (b.item ?? '').toLowerCase();
-            }
+    return expenses.filter((e) => {
+      if (
+        query &&
+        !`${e.item} ${e.category} ${e.type}`.toLowerCase().includes(query)
+      )
+        return false;
 
-            if (av < bv) return sortDir === 'asc' ? -1 : 1;
-            if (av > bv) return sortDir === 'asc' ? 1 : -1;
-            return 0;
-        });
-        return arr;
-    }, [expenses, sortKey, sortDir]);
+      if (filterType !== "all" && e.type !== filterType) return false;
+      if (filterCategory !== "all" && e.category !== filterCategory)
+        return false;
 
-    return (
-        <main className="mx-auto max-w-4xl p-6 space-y-6">
-            <Card>
-                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle className="text-base">รายการทั้งหมด</CardTitle>
+      if (fromDate || toDate) {
+        const d = parseDDMMYYYY(e.date) as any;
 
-                    <div className="flex gap-2">
-                        <select
-                            className="h-9 rounded-md border bg-background px-3 text-sm"
-                            value={sortKey}
-                            onChange={(e) => setSortKey(e.target.value as SortKey)}
-                        >
-                            <option value="date">เรียงตามวันที่</option>
-                            <option value="category">เรียงตามหมวดหมู่</option>
-                            <option value="item">เรียงตามชื่อรายการ</option>
-                        </select>
+        const isValid = d instanceof Date && !isNaN(d.getTime());
 
-                        <select
-                            className="h-9 rounded-md border bg-background px-3 text-sm"
-                            value={sortDir}
-                            onChange={(e) => setSortDir(e.target.value as any)}
-                        >
-                            <option value="desc">มาก → น้อย / ล่าสุด</option>
-                            <option value="asc">น้อย → มาก / เก่าสุด</option>
-                        </select>
-                    </div>
-                </CardHeader>
+        if (!isValid) {
+          return false;
+        }
 
-                <CardContent>
-                    {loading ? (
-                        <div className="text-sm text-muted-foreground">กำลังโหลด...</div>
-                    ) : sorted.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">ยังไม่มีรายการ</div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-muted-foreground">
-                                        <th className="py-2 text-left">วันที่</th>
-                                        <th className="py-2 text-left">รายการ</th>
-                                        <th className="py-2 text-left">ประเภท</th>
-                                        <th className="py-2 text-left">หมวดหมู่</th>
-                                        <th className="py-2 text-right">จำนวนเงิน</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {sorted.map((e, i) => (
-                                        <tr key={i} className="border-b">
-                                            <td className="py-2">{e.date}</td>
-                                            <td className="py-2">{e.item}</td>
-                                            <td className="py-2">{e.type}</td>
-                                            <td className="py-2">{e.category}</td>
-                                            <td className="py-2 text-right tabular-nums">
-                                                {Number(e.amount).toLocaleString()}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </main>
-    );
+        const dTime = d.getTime();
+
+        if (fromDate && dTime < fromDate.getTime()) return false;
+        if (toDate && dTime > toDate.getTime()) return false;
+      }
+      return true;
+    });
+  }, [expenses, q, filterType, filterCategory, fromISO, toISO]);
+  const summary = useMemo(() => {
+    const total = filtered.reduce((sum, e) => sum + Number(e.amount ?? 0), 0);
+    return { count: filtered.length, total };
+  }, [filtered]);
+
+  return (
+    <main className="h-screen max-w-md mx-auto flex flex-col overflow-hidden bg-muted/40 font-sans">
+      <div className="flex-none p-6 pb-2 space-y-4">
+        <HistoryHeader
+          count={summary.count}
+          total={summary.total}
+          loading={loading}
+          onRefresh={load}
+        />
+        <HistoryFilters
+          q={q}
+          setQ={setQ}
+          filterType={filterType}
+          setFilterType={setFilterType}
+          filterCategory={filterCategory}
+          setFilterCategory={setFilterCategory}
+          fromISO={fromISO}
+          setFromISO={setFromISO}
+          toISO={toISO}
+          setToISO={setToISO}
+          onReset={() => {
+            setQ("");
+            setFilterType("all");
+            setFilterCategory("all");
+            setFromISO("");
+            setToISO("");
+          }}
+          optionSets={{
+            types: Array.from(new Set(expenses.map((e) => e.type))).sort(),
+            categories: Array.from(
+              new Set(expenses.map((e) => e.category)),
+            ).sort(),
+          }}
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 pb-24">
+        <HistoryList expenses={filtered} loading={loading} />
+      </div>
+    </main>
+  );
 }
