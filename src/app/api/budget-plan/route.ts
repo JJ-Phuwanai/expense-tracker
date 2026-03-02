@@ -17,7 +17,10 @@ const getCurrentMonthStr = () => {
   return `${month}/${year}`;
 };
 
-export async function GET() {
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const personId = searchParams.get("personId") || "1";
+
   const sheets = await getSheetsClient();
   const currentMonthStr = getCurrentMonthStr();
 
@@ -72,7 +75,7 @@ export async function GET() {
       date: r[4] ?? "",
       note: r[5] ?? "",
     }))
-    .filter((p) => p.person_id === "1" && p.date === currentMonthStr);
+    .filter((p) => p.person_id === personId && p.date === currentMonthStr);
 
   return NextResponse.json({ plans });
 }
@@ -123,4 +126,32 @@ export async function PATCH(req: Request) {
     },
   });
   return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { rowIndex } = await req.json();
+    const sheets = await getSheetsClient();
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SHEET_ID,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: 1535731208,
+                dimension: "ROWS",
+                startIndex: rowIndex - 1,
+                endIndex: rowIndex,
+              },
+            },
+          },
+        ],
+      },
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: "Delete failed" }, { status: 500 });
+  }
 }

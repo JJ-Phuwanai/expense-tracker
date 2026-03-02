@@ -46,16 +46,20 @@ export function HistoryList({ expenses, loading }: HistoryListProps) {
               <p className="text-sm font-bold text-foreground leading-tight truncate">
                 {e.item}
               </p>
-              <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">
-                {e.date} • {e.category}
+              <p className="text-[10px] text-muted-foreground font-semibold mt-0.5 flex items-center gap-1.5">
+                <span>{e.date}</span>
+                <span>•</span>
+                <span>{e.category}</span>
+                <span>•</span>
+                <span className="text-primary/80 font-black uppercase tracking-tighter">
+                  {e.owner}
+                </span>
               </p>
             </div>
           </div>
-          {/* แสดงเครื่องหมาย +/- ตามประเภทรายการ */}
           <p
             className={`font-mono text-base font-extrabold shrink-0 ${e.type === "รายรับ" ? "text-primary" : "text-foreground"}`}
           >
-            {e.type === "รายรับ" ? "+" : "-"}
             {formatMoney(Number(e.amount))}
           </p>
         </div>

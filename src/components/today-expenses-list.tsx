@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Wallet, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { todayDDMMYYYY } from "@/lib/date";
+import { useUser } from "@/context/user-context";
 
 interface TodayExpensesListProps {
   expenses: any[];
@@ -13,12 +14,11 @@ export function TodayExpensesList({
   expenses,
   loading,
 }: TodayExpensesListProps) {
-  // กรองเฉพาะรายการที่เป็นของวันนี้
+  const { userName } = useUser();
   const todayExpenses = useMemo(() => {
     const today = todayDDMMYYYY();
-    return expenses.filter((e) => e.date === today);
-  }, [expenses]);
-
+    return expenses.filter((e) => e.date === today && e.owner === userName);
+  }, [expenses, userName]);
   if (loading) {
     return (
       <div className="text-sm text-muted-foreground text-center py-10 animate-pulse font-medium">
