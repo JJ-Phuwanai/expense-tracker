@@ -23,3 +23,8 @@ export default function RootLayout({
     </html>
   );
 }
+
+export const metadata = {
+  title: "Budget Craft",
+  manifest: "/manifest.json",
+};
