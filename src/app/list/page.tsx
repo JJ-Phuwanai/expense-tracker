@@ -68,27 +68,44 @@ export default function HistoryPage() {
 
     const filteredByTab = useMemo(() => {
         const query = q.trim().toLowerCase();
-        const fromDate = fromISO ? toStartOfDay(new Date(fromISO)) : null;
-        const toDate = toISO ? toEndOfDay(new Date(toISO)) : null;
+        const fromDate = fromISO ? toStartOfDay(new Date(fromISO + 'T00:00:00')) : null;
+        const toDate = toISO ? toEndOfDay(new Date(toISO + 'T23:59:59')) : null;
+
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+
+        const hasActiveFilter =
+            query !== '' || filterCategory !== 'all' || filterOwner !== 'all' || fromISO !== '' || toISO !== '';
 
         return expenses.filter((e) => {
             if (e.type !== activeTab) return false;
 
-            if (query && !`${e.item} ${e.category}`.toLowerCase().includes(query)) return false;
+            let itemDate: Date | null = null;
+            const dateParts = e.date.split('/');
 
-            if (filterCategory !== 'all' && e.category !== filterCategory) return false;
-
-            if (fromDate || toDate) {
-                const d = parseDDMMYYYY(e.date) as any;
-                const isValid = d instanceof Date && !isNaN(d.getTime());
-                if (!isValid) return false;
-
-                if (fromDate && d.getTime() < fromDate.getTime()) return false;
-                if (toDate && d.getTime() > toDate.getTime()) return false;
+            if (dateParts.length === 3) {
+                itemDate = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
+            } else if (dateParts.length === 2) {
+                itemDate = new Date(parseInt(dateParts[1]), parseInt(dateParts[0]) - 1, 1);
             }
+
+            if (!itemDate || isNaN(itemDate.getTime())) return false;
+
+            if (!hasActiveFilter) {
+                return itemDate.getMonth() + 1 === currentMonth && itemDate.getFullYear() === currentYear;
+            }
+
+            if (query && !`${e.item} ${e.category} ${e.owner}`.toLowerCase().includes(query)) return false;
+            if (filterCategory !== 'all' && e.category !== filterCategory) return false;
+            if (filterOwner !== 'all' && e.owner !== filterOwner) return false;
+
+            if (fromDate && itemDate.getTime() < fromDate.getTime()) return false;
+            if (toDate && itemDate.getTime() > toDate.getTime()) return false;
+
             return true;
         });
-    }, [expenses, q, filterCategory, fromISO, toISO, activeTab]);
+    }, [expenses, q, filterCategory, filterOwner, fromISO, toISO, activeTab]);
 
     const summary = useMemo(() => {
         const total = filteredByTab.reduce((sum, e) => sum + Number(e.amount ?? 0), 0);
@@ -137,6 +154,7 @@ export default function HistoryPage() {
                     onReset={() => {
                         setQ('');
                         setFilterCategory('all');
+                        setFilterOwner('all');
                         setFromISO('');
                         setToISO('');
                     }}

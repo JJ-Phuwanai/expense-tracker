@@ -17,6 +17,13 @@ export function BudgetItemList({ section, items, onDelete, onEdit, onAdd, onTogg
             .reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
     }, [dailyExpenses]);
 
+    const actualLuxSpent = useMemo(() => {
+        if (!dailyExpenses) return 0;
+        return dailyExpenses
+            .filter((exp: any) => exp.category === 'ฟุ่มเฟือย')
+            .reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
+    }, [dailyExpenses]);
+
     return (
         <div className="space-y-5 pt-2 px-4 relative overflow-visible">
             <div className="space-y-4">
@@ -27,6 +34,7 @@ export function BudgetItemList({ section, items, onDelete, onEdit, onAdd, onTogg
                     const swipeWidth = -100;
 
                     const isFuelItem = plan.item === 'ค่าน้ำมันพาหนะ';
+                    const isLuxItem = plan.item === 'ฟุ่มเฟือย';
 
                     return (
                         <div key={plan.rowIndex} className="relative group overflow-visible">
@@ -66,13 +74,10 @@ export function BudgetItemList({ section, items, onDelete, onEdit, onAdd, onTogg
                                         setConfirmingRow(null);
                                     }
                                 }}
-                                className={`relative z-10 flex items-center justify-between p-5 bg-white border border-border/10 rounded-[2rem] 
-                  shadow-[0_8px_30px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-all touch-pan-y ${
-                      isPaid ? 'opacity-60' : 'opacity-100 cursor-pointer'
-                  }`}
+                                className={`relative z-10 flex items-center justify-between p-5 bg-white border border-border/10 rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-all touch-pan-y ${isPaid ? 'opacity-60' : 'opacity-100 cursor-pointer'}`}
                             >
                                 <div className="flex items-center gap-4 min-w-0 flex-1">
-                                    {section !== 'เงินเดือน' && !isFuelItem && (
+                                    {section !== 'เงินเดือน' && !isFuelItem && !isLuxItem && (
                                         <button
                                             className={`paid-btn shrink-0 transition-colors p-1 -m-1 ${
                                                 isPaid ? 'text-emerald-500' : 'text-muted-foreground/30'
@@ -104,10 +109,10 @@ export function BudgetItemList({ section, items, onDelete, onEdit, onAdd, onTogg
 
                                 <div className="flex items-center gap-4 shrink-0 text-right">
                                     <div className="flex items-baseline gap-1.5">
-                                        {isFuelItem && (
+                                        {(isFuelItem || isLuxItem) && (
                                             <>
                                                 <span className="font-sans text-base font-bold text-emerald-600">
-                                                    ฿{actualFuelSpent.toLocaleString()}
+                                                    ฿{(isFuelItem ? actualFuelSpent : actualLuxSpent).toLocaleString()}
                                                 </span>
                                                 <span className="text-slate-300 font-bold font-sans text-base">/</span>
                                             </>

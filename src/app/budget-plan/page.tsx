@@ -51,8 +51,16 @@ export default function BudgetPlanPage() {
         loadData();
     }, [loadData]);
 
+    //
     const NetSpent = useMemo(() => {
-        const myItems = dailyExpenses.filter((item) => String(item.owner) === String(userName));
+        const myItems = dailyExpenses.filter(
+            (item) =>
+                String(item.owner) === String(userName) &&
+                item.date.includes(currentMonthValue) &&
+                item.category !== 'น้ำมันรถ' &&
+                item.category !== 'ฟุ่มเฟือย',
+        );
+
         let income = 0;
         let expense = 0;
 
@@ -63,32 +71,40 @@ export default function BudgetPlanPage() {
         });
 
         return income - expense;
-    }, [dailyExpenses, currentUserId]);
+    }, [dailyExpenses, userName, currentMonthValue]);
 
     const actualFuelSpent = useMemo(() => {
         return dailyExpenses
-            .filter((exp: any) => exp.owner === userName && exp.category === 'น้ำมันรถ')
+            .filter(
+                (exp: any) =>
+                    exp.owner === userName && exp.category === 'น้ำมันรถ' && exp.date.includes(currentMonthValue),
+            )
             .reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
-    }, [dailyExpenses, userName]);
+    }, [dailyExpenses, userName, currentMonthValue]);
+
+    const actualLuxSpent = useMemo(() => {
+        return dailyExpenses
+            .filter(
+                (exp: any) =>
+                    exp.owner === userName && exp.category === 'ฟุ่มเฟือย' && exp.date.includes(currentMonthValue),
+            )
+            .reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
+    }, [dailyExpenses, userName, currentMonthValue]);
 
     const groupedPlans = useMemo(() => {
         const groups: any = {};
-        const myPlans = plans.filter((p) => String(p.person_id) === String(currentUserId));
+        const myPlans = plans.filter(
+            (p) => String(p.person_id) === String(currentUserId) && p.date === currentMonthValue,
+        );
 
         myPlans.forEach((p) => {
             const sec = p.section || 'อื่นๆ';
-            if (!groups[sec])
-                groups[sec] = {
-                    total: 0,
-                    unpaidTotal: 0,
-                    count: 0,
-                    unpaidCount: 0,
-                    items: [],
-                };
+            if (!groups[sec]) groups[sec] = { total: 0, unpaidTotal: 0, count: 0, unpaidCount: 0, items: [] };
             const amt = Number(p.amount);
 
-            if (p.item === 'ค่าน้ำมันพาหนะ') {
-                const remaining = Math.max(0, amt - actualFuelSpent);
+            if (p.item === 'ค่าน้ำมันพาหนะ' || p.item === 'ฟุ่มเฟือย') {
+                const spent = p.item === 'ค่าน้ำมันพาหนะ' ? actualFuelSpent : actualLuxSpent;
+                const remaining = Math.max(0, amt - spent);
                 groups[sec].unpaidTotal += remaining;
                 if (remaining > 0) groups[sec].unpaidCount += 1;
             } else if (p.note !== 'จ่ายแล้ว') {
@@ -101,7 +117,32 @@ export default function BudgetPlanPage() {
             groups[sec].items.push(p);
         });
         return groups;
-    }, [plans, currentUserId, actualFuelSpent]);
+    }, [plans, currentUserId, actualFuelSpent, actualLuxSpent, currentMonthValue]);
+
+    //
+    const totalPlannedExpenses = useMemo(() => {
+        const myPlans = plans.filter(
+            (p) =>
+                String(p.person_id) === String(currentUserId) &&
+                p.section !== 'เงินเดือน' &&
+                p.date === currentMonthValue,
+        );
+
+        return myPlans.reduce((sum, p) => {
+            const amt = Number(p.amount);
+
+            if (p.section === 'ค่าใช้จ่ายประจำเดือน') {
+                return sum + Math.max(0, amt - Math.abs(NetSpent));
+            }
+
+            if (p.item === 'ค่าน้ำมันพาหนะ' || p.item === 'ฟุ่มเฟือย') {
+                const spent = p.item === 'ค่าน้ำมันพาหนะ' ? actualFuelSpent : actualLuxSpent;
+                return sum + Math.max(0, amt - spent);
+            }
+
+            return p.note !== 'จ่ายแล้ว' ? sum + amt : sum;
+        }, 0);
+    }, [plans, currentUserId, actualFuelSpent, actualLuxSpent, currentMonthValue, NetSpent]);
 
     const sortedSections = useMemo(() => {
         const entries = Object.entries(groupedPlans);
@@ -114,18 +155,6 @@ export default function BudgetPlanPage() {
         }
         return result;
     }, [groupedPlans]);
-
-    const totalPlannedExpenses = useMemo(() => {
-        const myPlans = plans.filter((p) => String(p.person_id) === String(currentUserId) && p.section !== 'เงินเดือน');
-
-        return myPlans.reduce((sum, p) => {
-            const amt = Number(p.amount);
-            if (p.item === 'ค่าน้ำมันพาหนะ') {
-                return sum + Math.max(0, amt - actualFuelSpent);
-            }
-            return p.note !== 'จ่ายแล้ว' ? sum + amt : sum;
-        }, 0);
-    }, [plans, currentUserId, actualFuelSpent]);
 
     const handleDeleteAction = async () => {
         const res = await fetch('/api/budget-plan', {
