@@ -5,10 +5,38 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, PlusCircle, CheckCircle2, Circle, AlertCircle } from 'lucide-react';
 import { useUser } from '@/context/user-context';
 
-export function BudgetItemList({ section, items, onDelete, onEdit, onAdd, onTogglePaid, dailyExpenses }: any) {
-    const { currentUserId } = useUser();
+export function BudgetItemList({
+    section,
+    items,
+    onDelete,
+    onEdit,
+    onAdd,
+    onTogglePaid,
+    dailyExpenses,
+    currentMonth,
+}: any) {
+    const { currentUserId, userName } = useUser();
     const [confirmingRow, setConfirmingRow] = useState<number | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+
+    const actualDailySpent = useMemo(() => {
+        if (!dailyExpenses) return 0;
+
+        const dailyItems = dailyExpenses.filter(
+            (exp: any) =>
+                exp.owner === userName &&
+                exp.date.includes(currentMonth) &&
+                exp.category !== 'น้ำมันรถ' &&
+                exp.category !== 'ฟุ่มเฟือย' &&
+                exp.category !== 'ของใช้ในบ้าน',
+        );
+
+        let expense = 0;
+        dailyItems.forEach((item: any) => {
+            if (item.type === 'รายจ่าย') expense += Number(item.amount);
+        });
+        return expense;
+    }, [dailyExpenses, userName, currentMonth]);
 
     const actualFuelSpent = useMemo(() => {
         if (!dailyExpenses) return 0;
@@ -24,6 +52,13 @@ export function BudgetItemList({ section, items, onDelete, onEdit, onAdd, onTogg
             .reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
     }, [dailyExpenses]);
 
+    const actualHouseSpent = useMemo(() => {
+        if (!dailyExpenses) return 0;
+        return dailyExpenses
+            .filter((exp: any) => exp.category === 'ของใช้ในบ้าน')
+            .reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
+    }, [dailyExpenses]);
+
     return (
         <div className="space-y-5 pt-2 px-4 relative overflow-visible">
             <div className="space-y-4">
@@ -35,6 +70,20 @@ export function BudgetItemList({ section, items, onDelete, onEdit, onAdd, onTogg
 
                     const isFuelItem = plan.item === 'ค่าน้ำมันพาหนะ';
                     const isLuxItem = plan.item === 'ฟุ่มเฟือย';
+                    const isHouseItem = plan.item === 'ของใช้ในบ้าน';
+                    const isDailyItem = plan.item === 'ค่าอาหารรายวัน' || plan.section === 'ค่าใช้จ่ายประจำเดือน';
+
+                    const isTrackedItem = isFuelItem || isLuxItem || isDailyItem || isHouseItem;
+
+                    const spent = isFuelItem
+                        ? actualFuelSpent
+                        : isLuxItem
+                          ? actualLuxSpent
+                          : isHouseItem
+                            ? actualHouseSpent
+                            : actualDailySpent;
+
+                    const isOverBudget = spent > Number(plan.amount);
 
                     return (
                         <div key={plan.rowIndex} className="relative group overflow-visible">
@@ -77,42 +126,26 @@ export function BudgetItemList({ section, items, onDelete, onEdit, onAdd, onTogg
                                 className={`relative z-10 flex items-center justify-between p-5 bg-white border border-border/10 rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-all touch-pan-y ${isPaid ? 'opacity-60' : 'opacity-100 cursor-pointer'}`}
                             >
                                 <div className="flex items-center gap-4 min-w-0 flex-1">
-                                    {section !== 'เงินเดือน' && !isFuelItem && !isLuxItem && (
-                                        <button
-                                            className={`paid-btn shrink-0 transition-colors p-1 -m-1 ${
-                                                isPaid ? 'text-emerald-500' : 'text-muted-foreground/30'
-                                            } ${!isOwner ? 'pointer-events-none' : 'active:scale-90'}`}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (isOwner) onTogglePaid(plan);
-                                            }}
-                                        >
-                                            {isPaid ? (
-                                                <CheckCircle2 size={24} strokeWidth={2.5} />
-                                            ) : (
-                                                <Circle size={24} strokeWidth={2} />
-                                            )}
+                                    {section !== 'เงินเดือน' && !isTrackedItem && (
+                                        <button className="paid-btn shrink-0" onClick={() => onTogglePaid(plan)}>
+                                            {isPaid ? <CheckCircle2 size={24} /> : <Circle size={24} />}
                                         </button>
                                     )}
 
                                     <div className="min-w-0">
-                                        <p
-                                            className={`text-[15px] font-black text-slate-900 truncate ${isPaid ? 'line-through decoration-emerald-500/50' : ''}`}
-                                        >
-                                            {plan.item}
-                                        </p>
-                                        <p className="text-[10px] text-muted-foreground font-bold tracking-tighter uppercase mt-1">
-                                            {plan.date} {isPaid && '• จ่ายแล้ว'}
-                                        </p>
+                                        <p className="text-[15px] font-black text-slate-900 truncate">{plan.item}</p>
+                                        <p className="text-[10px] text-muted-foreground font-bold">{plan.date}</p>
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-4 shrink-0 text-right">
                                     <div className="flex items-baseline gap-1.5">
-                                        {(isFuelItem || isLuxItem) && (
+                                        {isTrackedItem && (
                                             <>
-                                                <span className="font-sans text-base font-bold text-emerald-600">
-                                                    ฿{(isFuelItem ? actualFuelSpent : actualLuxSpent).toLocaleString()}
+                                                <span
+                                                    className={`font-sans text-base font-bold ${isOverBudget ? 'text-red-500' : 'text-emerald-600'}`}
+                                                >
+                                                    ฿{spent.toLocaleString()}
                                                 </span>
                                                 <span className="text-slate-300 font-bold font-sans text-base">/</span>
                                             </>

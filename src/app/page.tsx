@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { todayDDMMYYYY } from '@/lib/date';
 import { CategoryDropdown } from '@/components/ui/category-dropdown';
 import { TodayExpensesList } from '@/components/today-expenses-list';
-import { Wallet, PlusCircle, ChevronDown } from 'lucide-react';
 import { useUser } from '@/context/user-context';
-import { AnimatePresence } from 'framer-motion';
 import { EditPopup } from '@/components/budget-home/home-list-edit';
+import { Plus, Loader2, CheckCircle2, XCircle, Wallet, PlusCircle, ChevronDown } from 'lucide-react';
+import { scanSlip } from '@/lib/ocr-helper';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function HomePage() {
     const { currentUserId, userName, users, switchUser } = useUser();
@@ -21,6 +22,9 @@ export default function HomePage() {
     const [category, setCategory] = useState('');
     const [amount, setAmount] = useState('');
     const [editingExpense, setEditingExpense] = useState<any>(null);
+
+    const [uploadStatus, setUploadStatus] = useState<'idle' | 'scanning' | 'saving' | 'success' | 'error'>('idle');
+    const [statusMsg, setStatusMsg] = useState('');
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -106,6 +110,64 @@ export default function HomePage() {
 
         return income - expense;
     }, [expenses, userName]);
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            setUploadStatus('scanning');
+            setStatusMsg('กำลังอ่านข้อมูลสลิป...');
+
+            const result = await scanSlip(file);
+
+            if (!result || result.amount == null || result.amount <= 0) {
+                setUploadStatus('error');
+                setStatusMsg('ไม่พบข้อมูลยอดเงินในสลิป');
+                setTimeout(() => setUploadStatus('idle'), 2000);
+                return;
+            }
+
+            setUploadStatus('saving');
+            setStatusMsg(`ตรวจพบ ฿${result.amount} กำลังบันทึก...`);
+
+            const expenseDate = result.formattedDate || todayDDMMYYYY();
+
+            const res = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: result.amount,
+                    item: result.itemName || 'รายการจากสลิป',
+                    category: 'ค่าใช้จ่ายประจำเดือน',
+                    type: 'รายจ่าย',
+                    date: expenseDate,
+                    owner: userName,
+                    person_id: currentUserId,
+                }),
+            });
+
+            if (!res.ok) {
+                setUploadStatus('error');
+                setStatusMsg('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง');
+                setTimeout(() => setUploadStatus('idle'), 2000);
+                return;
+            }
+
+            setUploadStatus('success');
+            setStatusMsg('บันทึกข้อมูลเรียบร้อย!');
+            await loadData();
+
+            setTimeout(() => setUploadStatus('idle'), 1500);
+        } catch (error) {
+            console.error('handleFileSelect error:', error);
+            setUploadStatus('error');
+            setStatusMsg('อ่านสลิปไม่สำเร็จ');
+            setTimeout(() => setUploadStatus('idle'), 2000);
+        } finally {
+            e.target.value = '';
+        }
+    };
 
     return (
         <main className="h-screen max-w-md mx-auto flex flex-col overflow-hidden bg-muted/40 font-sans">
@@ -235,6 +297,42 @@ export default function HomePage() {
                     />
                 </div>
             </div>
+
+            <div className="fixed bottom-23 right-2 z-[60]">
+                <label className="flex items-center justify-center w-12 h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-2xl cursor-pointer transition-all active:scale-90">
+                    <Plus size={28} />
+                    <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+                </label>
+            </div>
+
+            <AnimatePresence>
+                {uploadStatus !== 'idle' && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-background/20 backdrop-blur-sm p-10"
+                    >
+                        <div className="bg-card p-8 rounded-[2.5rem] shadow-2xl border border-border/50 flex flex-col items-center space-y-4 min-w-[240px]">
+                            {(uploadStatus === 'scanning' || uploadStatus === 'saving') && (
+                                <Loader2 className="w-16 h-16 text-emerald-500 animate-spin" />
+                            )}
+                            {uploadStatus === 'success' && (
+                                <div className="bg-emerald-100 p-4 rounded-full">
+                                    <CheckCircle2 className="w-16 h-16 text-emerald-600" />
+                                </div>
+                            )}
+                            {uploadStatus === 'error' && (
+                                <div className="bg-destructive/10 p-4 rounded-full">
+                                    <XCircle className="w-16 h-16 text-destructive" />
+                                </div>
+                            )}
+
+                            <p className="text-lg font-black text-center">{statusMsg}</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {editingExpense && (

@@ -51,14 +51,14 @@ export default function BudgetPlanPage() {
         loadData();
     }, [loadData]);
 
-    //
     const NetSpent = useMemo(() => {
         const myItems = dailyExpenses.filter(
             (item) =>
                 String(item.owner) === String(userName) &&
                 item.date.includes(currentMonthValue) &&
                 item.category !== 'น้ำมันรถ' &&
-                item.category !== 'ฟุ่มเฟือย',
+                item.category !== 'ฟุ่มเฟือย' &&
+                item.category !== 'ของใช้ในบ้าน',
         );
 
         let income = 0;
@@ -91,6 +91,32 @@ export default function BudgetPlanPage() {
             .reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
     }, [dailyExpenses, userName, currentMonthValue]);
 
+    const actualHouseSpent = useMemo(() => {
+        return dailyExpenses
+            .filter(
+                (exp: any) =>
+                    exp.owner === userName && exp.category === 'ของใช้ในบ้าน' && exp.date.includes(currentMonthValue),
+            )
+            .reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
+    }, [dailyExpenses, userName, currentMonthValue]);
+
+    const variableStats = useMemo(() => {
+        const monthlyPlan = plans.find((p) => p.section === 'ค่าใช้จ่ายประจำเดือน' && p.date === currentMonthValue);
+        const fuelPlan = plans.find((p) => p.item === 'ค่าน้ำมันพาหนะ' && p.date === currentMonthValue);
+        const luxPlan = plans.find((p) => p.item === 'ฟุ่มเฟือย' && p.date === currentMonthValue);
+        const housePlan = plans.find((p) => p.item === 'ของใช้ในบ้าน' && p.date === currentMonthValue);
+
+        const plannedTotal =
+            (Number(monthlyPlan?.amount) || 0) +
+            (Number(fuelPlan?.amount) || 0) +
+            (Number(luxPlan?.amount) || 0) +
+            (Number(housePlan?.amount) || 0);
+
+        const spentTotal = Math.abs(NetSpent) + actualFuelSpent + actualLuxSpent + actualHouseSpent;
+
+        return { spentTotal, plannedTotal };
+    }, [plans, currentMonthValue, NetSpent, actualFuelSpent, actualLuxSpent, actualHouseSpent]);
+
     const groupedPlans = useMemo(() => {
         const groups: any = {};
         const myPlans = plans.filter(
@@ -98,16 +124,29 @@ export default function BudgetPlanPage() {
         );
 
         myPlans.forEach((p) => {
-            const sec = p.section || 'อื่นๆ';
+            let sec = p.section || 'อื่นๆ';
+            if (
+                sec === 'ค่าใช้จ่ายประจำเดือน' ||
+                p.item === 'ค่าน้ำมันพาหนะ' ||
+                p.item === 'ฟุ่มเฟือย' ||
+                p.item === 'ของใช้ในบ้าน'
+            ) {
+                sec = 'ค่าใช้จ่ายผันแปร';
+            }
+
             if (!groups[sec]) groups[sec] = { total: 0, unpaidTotal: 0, count: 0, unpaidCount: 0, items: [] };
             const amt = Number(p.amount);
 
             if (p.item === 'ค่าน้ำมันพาหนะ' || p.item === 'ฟุ่มเฟือย') {
                 const spent = p.item === 'ค่าน้ำมันพาหนะ' ? actualFuelSpent : actualLuxSpent;
-                const remaining = Math.max(0, amt - spent);
+                const remaining = amt - spent;
                 groups[sec].unpaidTotal += remaining;
                 if (remaining > 0) groups[sec].unpaidCount += 1;
-            } else if (p.note !== 'จ่ายแล้ว') {
+            } else if (p.section === 'ค่าใช้จ่ายประจำเดือน') {
+                const remaining = amt - Math.abs(NetSpent);
+                groups[sec].unpaidTotal += remaining;
+                if (remaining > 0) groups[sec].unpaidCount += 1;
+            } else if (p.note !== 'จ่ายแล้ว' && sec !== 'เงินเดือน') {
                 groups[sec].unpaidTotal += amt;
                 groups[sec].unpaidCount += 1;
             }
@@ -117,9 +156,8 @@ export default function BudgetPlanPage() {
             groups[sec].items.push(p);
         });
         return groups;
-    }, [plans, currentUserId, actualFuelSpent, actualLuxSpent, currentMonthValue]);
+    }, [plans, currentUserId, actualFuelSpent, actualLuxSpent, currentMonthValue, NetSpent]);
 
-    //
     const totalPlannedExpenses = useMemo(() => {
         const myPlans = plans.filter(
             (p) =>
@@ -128,33 +166,30 @@ export default function BudgetPlanPage() {
                 p.date === currentMonthValue,
         );
 
-        return myPlans.reduce((sum, p) => {
-            const amt = Number(p.amount);
-
-            if (p.section === 'ค่าใช้จ่ายประจำเดือน') {
-                return sum + Math.max(0, amt - Math.abs(NetSpent));
-            }
-
-            if (p.item === 'ค่าน้ำมันพาหนะ' || p.item === 'ฟุ่มเฟือย') {
-                const spent = p.item === 'ค่าน้ำมันพาหนะ' ? actualFuelSpent : actualLuxSpent;
-                return sum + Math.max(0, amt - spent);
-            }
-
-            return p.note !== 'จ่ายแล้ว' ? sum + amt : sum;
-        }, 0);
-    }, [plans, currentUserId, actualFuelSpent, actualLuxSpent, currentMonthValue, NetSpent]);
+        return myPlans.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    }, [plans, currentUserId, currentMonthValue]);
 
     const sortedSections = useMemo(() => {
         const entries = Object.entries(groupedPlans);
         const result = [...entries];
-        const monthlyIdx = result.findIndex(([name]) => name === 'ค่าใช้จ่ายประจำเดือน');
-        if (monthlyIdx !== -1) {
-            const [item] = result.splice(monthlyIdx, 1);
+
+        const variableIdx = result.findIndex(([name]) => name === 'ค่าใช้จ่ายผันแปร');
+
+        if (variableIdx !== -1) {
+            const [item] = result.splice(variableIdx, 1);
             const salaryIdx = result.findIndex(([name]) => name === 'เงินเดือน');
             result.splice(salaryIdx + 1, 0, item);
         }
         return result;
     }, [groupedPlans]);
+
+    const salaryTotal = useMemo(() => {
+        return groupedPlans['เงินเดือน']?.total || 0;
+    }, [groupedPlans]);
+
+    const remainingBalance = useMemo(() => {
+        return salaryTotal - totalPlannedExpenses;
+    }, [salaryTotal, totalPlannedExpenses]);
 
     const handleDeleteAction = async () => {
         const res = await fetch('/api/budget-plan', {
@@ -187,14 +222,10 @@ export default function BudgetPlanPage() {
                 selectedSection={selectedSection}
                 displayTitle={selectedSection ? `หมวดหมู่: ${selectedSection}` : `แผนงานเดือน ${currentMonthLabel}`}
                 onBack={() => setSelectedSection(null)}
-                totalAmount={selectedSection ? groupedPlans[selectedSection].unpaidTotal : totalPlannedExpenses}
-                headerLabel={
-                    selectedSection === 'เงินเดือน'
-                        ? 'รายได้ทั้งหมด'
-                        : selectedSection
-                          ? 'ยอดคงเหลือที่ต้องจ่าย'
-                          : 'ยอดรวมแผนงานทั้งหมด'
-                }
+                totalAmount={selectedSection ? groupedPlans[selectedSection].total : totalPlannedExpenses}
+                remainingBalance={remainingBalance}
+                showBalance={!selectedSection}
+                headerLabel={selectedSection === 'เงินเดือน' ? 'รายได้ทั้งหมด' : 'ยอดแผนงานรวมทั้งหมด'}
             />
 
             <div className="flex-1 overflow-y-auto px-6 pb-32 scrollbar-hide">
@@ -203,15 +234,9 @@ export default function BudgetPlanPage() {
                 ) : !selectedSection ? (
                     <BudgetGrid
                         sortedSections={sortedSections}
-                        totalSpent={NetSpent}
+                        totalSpent={variableStats.spentTotal}
                         onSelect={(name: string) => {
-                            if (name === 'ค่าใช้จ่ายประจำเดือน') {
-                                const plan = plans.find((p) => p.section === name);
-                                if (plan) {
-                                    setLimitData({ rowIndex: plan.rowIndex, amount: plan.amount.toString() });
-                                    setIsLimitModalOpen(true);
-                                }
-                            } else setSelectedSection(name);
+                            setSelectedSection(name);
                         }}
                         onAdd={() => {
                             setEditingRow(null);
@@ -223,6 +248,7 @@ export default function BudgetPlanPage() {
                         section={selectedSection}
                         items={groupedPlans[selectedSection].items}
                         dailyExpenses={dailyExpenses}
+                        currentMonth={currentMonthValue}
                         onEdit={(plan: any) => {
                             setEditingRow(plan.rowIndex);
                             setFormData({

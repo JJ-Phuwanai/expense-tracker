@@ -2,12 +2,20 @@ import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { useUser } from '@/context/user-context';
 import { useState } from 'react';
 
-export function BudgetHeader({ selectedSection, displayTitle, onBack, totalAmount, headerLabel }: any) {
+export function BudgetHeader({
+    selectedSection,
+    displayTitle,
+    onBack,
+    totalAmount,
+    headerLabel,
+    remainingBalance,
+    showBalance,
+}: any) {
     const { userName, users, switchUser } = useUser();
     const [showPicker, setShowPicker] = useState(false);
 
     return (
-        <div className="flex-none p-6 pb-6 pt-8 bg-muted/40 backdrop-blur-md z-20">
+        <div className="flex-none p-6 pb-4 pt-8 bg-muted/40 backdrop-blur-md z-20">
             <div className="flex justify-between items-start px-1">
                 <div className="space-y-0.5">
                     <div className="flex items-center gap-2 relative">
@@ -61,6 +69,19 @@ export function BudgetHeader({ selectedSection, displayTitle, onBack, totalAmoun
                         ฿{totalAmount.toLocaleString()}
                         <span className="text-[10px] ml-1 font-bold text-muted-foreground uppercase">บาท</span>
                     </span>
+
+                    {showBalance && (
+                        <div className="mt-0 animate-in fade-in slide-in-from-right-2 duration-300">
+                            <span className="text-[8px] text-muted-foreground font-black uppercase tracking-tighter">
+                                คงเหลือ:
+                            </span>
+                            <span
+                                className={`text-[11px] font-black ml-1 ${remainingBalance < 0 ? 'text-red-500' : 'text-emerald-600'}`}
+                            >
+                                ฿{remainingBalance.toLocaleString()}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
