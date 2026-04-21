@@ -9,20 +9,13 @@ const kanit = Kanit({
     variable: '--font-kanit',
 });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-    return (
-        <html lang="th" className={`${kanit.variable} h-full`}>
-            <body className="antialiased bg-muted/40 h-full overflow-hidden font-sans">
-                <UserProvider>{children}</UserProvider>
-                <BottomNav />
-            </body>
-        </html>
-    );
-}
-
 export const metadata = {
     title: 'Budget Craft',
+    description: 'แอปจัดการงบประมาณสไตล์คราฟต์',
     manifest: '/manifest.json',
+    icons: {
+        apple: '/290850.png',
+    },
 };
 
 export const viewport = {
@@ -30,4 +23,19 @@ export const viewport = {
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
+    themeColor: '#0a0a0a',
 };
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <html lang="th" className={`${kanit.variable} h-full`}>
+            <head>
+                <link rel="apple-touch-icon" href="/290850.png" />
+            </head>
+            <body className="antialiased bg-muted/40 h-full overflow-hidden font-sans">
+                <UserProvider>{children}</UserProvider>
+                <BottomNav />
+            </body>
+        </html>
+    );
+}
