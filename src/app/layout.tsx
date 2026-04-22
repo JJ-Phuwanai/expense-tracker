@@ -13,7 +13,7 @@ export const metadata = {
     title: 'Budget Craft',
     manifest: '/manifest.json',
     icons: {
-        apple: '/290850.png',
+        apple: '/apple-touch-icon.png',
     },
 };
 
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return (
         <html lang="th" className={`${kanit.variable} h-full`}>
             <head>
-                <link rel="apple-touch-icon" sizes="180x180" href="/290850.png" />
+                <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-title" content="Budget" />
             </head>
