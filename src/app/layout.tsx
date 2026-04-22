@@ -11,7 +11,6 @@ const kanit = Kanit({
 
 export const metadata = {
     title: 'Budget Craft',
-    description: 'แอปจัดการงบประมาณสไตล์คราฟต์',
     manifest: '/manifest.json',
     icons: {
         apple: '/290850.png',
@@ -30,7 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return (
         <html lang="th" className={`${kanit.variable} h-full`}>
             <head>
-                <link rel="apple-touch-icon" href="/290850.png" />
+                <link rel="apple-touch-icon" sizes="180x180" href="/290850.png" />
+                <meta name="apple-mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-title" content="Budget" />
             </head>
             <body className="antialiased bg-muted/40 h-full overflow-hidden font-sans">
                 <UserProvider>{children}</UserProvider>

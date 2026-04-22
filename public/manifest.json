@@ -17,20 +17,7 @@
             "src": "/290850.png",
             "sizes": "512x512",
             "type": "image/png",
-            "purpose": "maskable"
+            "purpose": "any maskable"
         }
-    ],
-    "share_target": {
-        "action": "/share-receipt",
-        "method": "POST",
-        "enctype": "multipart/form-data",
-        "params": {
-            "files": [
-                {
-                    "name": "file",
-                    "accept": ["image/jpeg", "image/png", "image/webp"]
-                }
-            ]
-        }
-    }
+    ]
 }
