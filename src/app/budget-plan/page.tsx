@@ -137,8 +137,13 @@ export default function BudgetPlanPage() {
             if (!groups[sec]) groups[sec] = { total: 0, unpaidTotal: 0, count: 0, unpaidCount: 0, items: [] };
             const amt = Number(p.amount);
 
-            if (p.item === 'ค่าน้ำมันพาหนะ' || p.item === 'ฟุ่มเฟือย') {
-                const spent = p.item === 'ค่าน้ำมันพาหนะ' ? actualFuelSpent : actualLuxSpent;
+            if (p.item === 'ค่าน้ำมันพาหนะ' || p.item === 'ฟุ่มเฟือย' || p.item === 'ของใช้ในบ้าน') {
+                const spent =
+                    p.item === 'ค่าน้ำมันพาหนะ'
+                        ? actualFuelSpent
+                        : p.item === 'ฟุ่มเฟือย'
+                          ? actualLuxSpent
+                          : actualHouseSpent;
                 const remaining = amt - spent;
                 groups[sec].unpaidTotal += remaining;
                 if (remaining > 0) groups[sec].unpaidCount += 1;
@@ -156,7 +161,7 @@ export default function BudgetPlanPage() {
             groups[sec].items.push(p);
         });
         return groups;
-    }, [plans, currentUserId, actualFuelSpent, actualLuxSpent, currentMonthValue, NetSpent]);
+    }, [plans, currentUserId, actualFuelSpent, actualLuxSpent, actualHouseSpent, currentMonthValue, NetSpent]);
 
     const totalPlannedExpenses = useMemo(() => {
         const myPlans = plans.filter(
